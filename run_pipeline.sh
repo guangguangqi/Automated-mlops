@@ -1,28 +1,30 @@
 #!/usr/bin/env bash
-set -e # Exit immediately if a command exits with a non-zero status
+#SBATCH --job-name=snakemake_orchestrator
+#SBATCH --partition=local             # 💡 Matches your local Slurm partition
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4G
+#SBATCH --time=12:00:00
+#SBATCH --output=logs/orchestrator-%j.out
 
-echo "========================================="
-echo "Starting Cloud-Native Snakemake Container on AWS Batch"
-echo "Target Sample: ${SAMPLE_ID}"
-echo "========================================="
+set -euo pipefail
 
-# Create a local clean execution environment inside the isolated container
-mkdir -p workspace/logs
-cd workspace
+S3_INPUT_PATH="${1}"
 
-# Execute Snakemake programmatically, injecting runtime variables as config overrides
-# We pass --cores all to utilize the full computing power provisioned by AWS Batch
-snakemake \
-    --snakefile /pipeline/Snakefile \
-    --cores all \
-    --verbose \
-    --config \
-        sample_id="${SAMPLE_ID}" \
-        bucket="${S3_BUCKET}" \
-        r1_key="${S3_KEY_R1}" \
-        r2_key="${S3_KEY_R2}" \
-        out_dir="${S3_OUTPUT_DIR}"
+# Refresh the 12-hour AWS ECR secure credential lease
+aws ecr get-login-password --region us-east-1 | apptainer registry login --username AWS --password-stdin docker://160450754194.dkr.ecr.us-east-1.amazonaws.com
 
-echo "========================================="
-echo "Pipeline Execution Completed Successfully!"
-echo "========================================="
+ECR_IMAGE="docker://160450754194.dkr.ecr.us-east-1.amazonaws.com/snakemake-qc-mlops:latest"
+
+export APPTAINERENV_AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}"
+export APPTAINERENV_AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
+
+# Fire the Orchestrator pointing to your profile
+apptainer exec \
+    -B /var/run/munge \
+    -B /usr/bin/sbatch \
+    -B /usr/bin/squeue \
+    -B /etc/slurm \
+    ${ECR_IMAGE} snakemake \
+        --snakefile /pipeline/Snakefile \
+        --profile slurm \
+        --config input_file="${S3_INPUT_PATH}"

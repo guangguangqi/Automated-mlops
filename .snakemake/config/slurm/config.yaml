@@ -1,0 +1,20 @@
+executor: slurm
+jobs: 4                            # Maximum concurrent jobs submitted to your local queue
+latency-wait: 60                  # Seconds to wait for output files to appear after jobs finish
+printshellcmds: true
+
+# Default resources for ALL rules unless overridden
+default-resources:
+  slurm_partition: "local"         # 💡 Updated to match your cluster's partition name exactly
+  runtime: 60                      # 1 hour default execution cap
+  mem_mb: 4000                     # 4GB default memory footprint
+  cpus_per_task: 1
+
+# Specific resource overrides for your Rules
+set-resources:
+  run_fastp:
+    slurm_partition: "local"
+    runtime: 120                   # 2 hours for raw read processing
+    mem_mb: 16000                  # 16GB RAM for fastp allocation
+    cpus_per_task: 4               # Request 4 cores dynamically via sbatch
+
