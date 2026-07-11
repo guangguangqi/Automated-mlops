@@ -5,7 +5,7 @@ import re
 import os
 
 # Define structural configurations
-BUCKET_NAME = "my-bioinfo-sequencing-data"  # 💡 Updated with your new bucket name
+BUCKET_NAME = "snakemake-qc-mlops-bucket"  # 💡 Updated with your new bucket name
 PREFIX = "raw/"
 PROJECT_DIR = os.path.expanduser("~/slurm_project")
 SEEN_DB_FILE = os.path.join(PROJECT_DIR, ".processed_samples.txt")
