@@ -25,15 +25,13 @@ def mark_sample_processed(sample_id):
         out.write(f"{sample_id}\n")
 
 def get_ecr_token():
-    """Dynamically generates a fresh 12-hour OCI password from AWS ECR"""
     try:
         response = ecr.get_authorization_token()
-        token = response['authorizationData'][0]['authorizationToken']
+        token = response['authorizationData']['authorizationToken']
         import base64
-        # Decrypt password from base64 encoding (format is AWS:password)
         decoded_token = base64.b64decode(token).decode('utf-8')
-        password = decoded_token.split(':')[1]
-        return password
+        password = decoded_token.split(':')
+        return password[1] # 💡 FIX: Return only the actual decrypted token string
     except Exception as e:
         print(f"[CRITICAL ERROR] Failed to fetch fresh ECR token: {str(e)}")
         return None
@@ -41,6 +39,11 @@ def get_ecr_token():
 def main():
     print(f"Initializing Secure On-Premises MLOps S3 Watcher for bucket: s3://{BUCKET_NAME}/{PREFIX}")
     print("Press Ctrl+C to terminate.")
+    
+    cache_dir = os.path.expanduser("~/slurm_project/.apptainer_cache")
+    tmp_dir = os.path.expanduser("~/slurm_project/.apptainer_tmp")
+    os.makedirs(cache_dir, exist_ok=True)
+    os.makedirs(tmp_dir, exist_ok=True)
     
     while True:
         try:
@@ -58,19 +61,19 @@ def main():
                         if sample_id not in processed_samples:
                             print(f"\n[NEW DATA DETECTED] Found s3://{BUCKET_NAME}/{file_key}")
                             
-                            # 💡 REPAIR: Generate token and pass it as environment variables to sbatch
                             ecr_password = get_ecr_token()
                             if not ecr_password:
                                 continue
                                 
                             s3_full_path = f"s3://{BUCKET_NAME}/{file_key}"
                             
-                            # Use sbatch --export to forcefully map auth keys into the Slurm shell environment
                             sbatch_cmd = (
                                 f"export APPTAINER_DOCKER_USERNAME='AWS' && "
                                 f"export APPTAINER_DOCKER_PASSWORD='{ecr_password}' && "
+                                f"export APPTAINER_CACHEDIR='{cache_dir}' && "
+                                f"export APPTAINER_TMPDIR='{tmp_dir}' && "
                                 f"cd {PROJECT_DIR} && "
-                                f"sbatch --export=ALL,APPTAINER_DOCKER_USERNAME,APPTAINER_DOCKER_PASSWORD "
+                                f"sbatch --export=ALL,APPTAINER_DOCKER_USERNAME,APPTAINER_DOCKER_PASSWORD,APPTAINER_CACHEDIR,APPTAINER_TMPDIR "
                                 f"run_pipeline.sh '{s3_full_path}'"
                             )
                             
@@ -90,4 +93,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
