@@ -4,7 +4,6 @@ FROM nvcr.io/nvidia/cuda:12.2.0-base-ubuntu22.04
 USER root
 
 # 2. Install basic compiler utilities, wget, and system tools
-# 💡 FIX: Added bzip2 so tar can extract the micromamba archive cleanly
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
@@ -14,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 3. Install Micromamba via direct script injection
-# 💡 FIX: Updated to use the explicit micro.mamba.pm architectural API endpoint
+# 💡 FIX: This specific API endpoint delivers the raw archive stream that tar expects!
 RUN curl -Ls https://mamba.pm | tar -xj -C /usr/bin/ --strip-components=1 micromamba
 
 # 4. Use micromamba to install bioconda packages natively compiled with CUDA/C++ support
@@ -38,4 +37,5 @@ COPY run_pipeline.sh /pipeline/run_pipeline.sh
 COPY scripts/ /pipeline/scripts/
 
 RUN chmod +x /pipeline/run_pipeline.sh
+
 
